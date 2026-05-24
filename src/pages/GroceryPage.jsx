@@ -1,20 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plus, RotateCcw, Settings, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import CheckItem from '../components/CheckItem';
 import {
-  getMeals,
-  getStaples,
-  saveStaples,
-  getMyGrocery,
-  saveMyGrocery,
-  getSisterGrocery,
-  saveSisterGrocery,
-  getActiveMealIds,
+  getStaples, saveStaples,
+  getMyGrocery, saveMyGrocery,
+  getSisterGrocery, saveSisterGrocery,
   saveActiveMealIds,
   uid,
 } from '../utils/storage';
 
-// Unchecked items first, checked items at the bottom
 function sortByChecked(items) {
   return [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
 }
@@ -25,9 +19,7 @@ function SectionHeader({ title, count, open, toggle, accent }) {
       <div className="flex items-center gap-2">
         <span className={`text-sm font-bold uppercase tracking-wider ${accent}`}>{title}</span>
         {count > 0 && (
-          <span className="text-xs bg-[#f5e8d6] text-[#7a5c48] px-2 py-0.5 rounded-full">
-            {count}
-          </span>
+          <span className="text-xs bg-[#f5e8d6] text-[#7a5c48] px-2 py-0.5 rounded-full">{count}</span>
         )}
       </div>
       {open
@@ -67,160 +59,141 @@ function AddItemRow({ placeholder, onAdd, isTJToggle }) {
           TJ's
         </button>
       )}
-      <button
-        onClick={submit}
-        className="bg-[#b5652a] text-white rounded-xl px-3 py-2 active:scale-95"
-      >
+      <button onClick={submit} className="bg-[#b5652a] text-white rounded-xl px-3 py-2 active:scale-95">
         <Plus size={18} />
       </button>
     </div>
   );
 }
 
-export default function GroceryPage() {
+export default function GroceryPage({ meals, activeMealIds }) {
   const [loading, setLoading] = useState(true);
 
-  // ── Staples ──────────────────────────────────────────────────────────────
-  const [staples, setStaples] = useState([]);
+  const [staples, setStaples]         = useState([]);
   const [staplesOpen, setStaplesOpen] = useState(true);
   const [editingStaples, setEditingStaples] = useState(false);
 
-  // ── Meal ingredients ─────────────────────────────────────────────────────
-  const [mealItems, setMealItems] = useState([]);
-  const [mealsOpen, setMealsOpen] = useState(true);
+  const [myExtras, setMyExtras]       = useState([]);
+  const [extrasOpen, setExtrasOpen]   = useState(true);
 
-  // ── My extras ────────────────────────────────────────────────────────────
-  const [myExtras, setMyExtras] = useState([]);
-  const [extrasOpen, setExtrasOpen] = useState(true);
-
-  // ── Sister's items ───────────────────────────────────────────────────────
   const [sisterItems, setSisterItems] = useState([]);
-  const [sisterOpen, setSisterOpen] = useState(true);
+  const [sisterOpen, setSisterOpen]   = useState(true);
 
-  // Load everything from Supabase on mount
+  // ── Load only grocery-specific data from Supabase ────────────────────────
+  // meals + activeMealIds come from App (always current, no race condition)
   useEffect(() => {
-    Promise.all([
-      getStaples(),
-      getMyGrocery(),
-      getSisterGrocery(),
-      getMeals(),
-      getActiveMealIds(),
-    ]).then(([stapleData, myData, sisterData, allMeals, activeIds]) => {
-      setStaples(stapleData);
-      setMyExtras(myData);
-      setSisterItems(sisterData);
-
-      // Build meal-driven ingredients
-      const activeMeals = allMeals.filter((m) => activeIds.includes(m.id));
-      const seen = new Set();
-      const items = [];
-      for (const meal of activeMeals) {
-        for (const ing of meal.ingredients) {
-          const key = ing.name.toLowerCase();
-          if (!seen.has(key)) {
-            seen.add(key);
-            items.push({
-              id: ing.id + '_' + meal.id,
-              name: ing.name,
-              isTJ: ing.isTJ,
-              fromMeal: meal.name,
-              checked: false,
-            });
-          }
-        }
-      }
-      setMealItems(items);
-      setLoading(false);
-    });
+    Promise.all([getStaples(), getMyGrocery(), getSisterGrocery()])
+      .then(([stapleData, myData, sisterData]) => {
+        setStaples(stapleData);
+        setMyExtras(myData);
+        setSisterItems(sisterData);
+        setLoading(false);
+      });
   }, []);
 
-  // ── Staple actions ────────────────────────────────────────────────────────
+  // ── Derive meal ingredients from live props ───────────────────────────────
+  const mealItems = useMemo(() => {
+    const activeMeals = meals.filter((m) => activeMealIds.includes(m.id));
+    const seen = new Set();
+    const items = [];
+    for (const meal of activeMeals) {
+      for (const ing of meal.ingredients ?? []) {
+        const key = ing.name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          items.push({
+            id: `${ing.id}_${meal.id}`,
+            name: ing.name,
+            isTJ: ing.isTJ,
+            fromMeal: meal.name,
+            checked: false,
+          });
+        }
+      }
+    }
+    return items;
+  }, [meals, activeMealIds]);
+
+  const [checkedMealItemIds, setCheckedMealItemIds] = useState(new Set());
+  const mealItemsWithChecked = mealItems.map((i) => ({
+    ...i,
+    checked: checkedMealItemIds.has(i.id),
+  }));
+
+  function toggleMealItem(id) {
+    setCheckedMealItemIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // ── Staples ───────────────────────────────────────────────────────────────
   function toggleStaple(id) {
     const updated = staples.map((s) => (s.id === id ? { ...s, checked: !s.checked } : s));
-    setStaples(updated);
-    saveStaples(updated);
+    setStaples(updated); saveStaples(updated);
   }
   function addStaple(name) {
     const updated = [...staples, { id: uid(), name, checked: false }];
-    setStaples(updated);
-    saveStaples(updated);
+    setStaples(updated); saveStaples(updated);
   }
   function deleteStaple(id) {
     const updated = staples.filter((s) => s.id !== id);
-    setStaples(updated);
-    saveStaples(updated);
+    setStaples(updated); saveStaples(updated);
   }
 
   // ── Reset week ────────────────────────────────────────────────────────────
   function resetWeek() {
-    const resetedStaples = staples.map((s) => ({ ...s, checked: false }));
-    setStaples(resetedStaples);
-    saveStaples(resetedStaples);
-
-    saveActiveMealIds([]);
-    setMealItems([]);
-
-    setMyExtras([]);
-    saveMyGrocery([]);
-
-    setSisterItems([]);
-    saveSisterGrocery([]);
+    const reset = staples.map((s) => ({ ...s, checked: false }));
+    setStaples(reset); saveStaples(reset);
+    saveActiveMealIds([]);   // clears activeMealIds in Supabase
+    setCheckedMealItemIds(new Set());
+    setMyExtras([]); saveMyGrocery([]);
+    setSisterItems([]); saveSisterGrocery([]);
   }
 
-  // ── Meal item actions ─────────────────────────────────────────────────────
-  function toggleMealItem(id) {
-    setMealItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i)));
-  }
-
-  // ── My extras actions ─────────────────────────────────────────────────────
+  // ── My extras ─────────────────────────────────────────────────────────────
   function toggleMyExtra(id) {
     const updated = myExtras.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i));
-    setMyExtras(updated);
-    saveMyGrocery(updated);
+    setMyExtras(updated); saveMyGrocery(updated);
   }
   function addMyExtra(name, isTJ) {
     const updated = [...myExtras, { id: uid(), name, isTJ, checked: false }];
-    setMyExtras(updated);
-    saveMyGrocery(updated);
+    setMyExtras(updated); saveMyGrocery(updated);
   }
   function deleteMyExtra(id) {
     const updated = myExtras.filter((i) => i.id !== id);
-    setMyExtras(updated);
-    saveMyGrocery(updated);
+    setMyExtras(updated); saveMyGrocery(updated);
   }
 
-  // ── Sister actions ────────────────────────────────────────────────────────
+  // ── Sister ────────────────────────────────────────────────────────────────
   function toggleSister(id) {
     const updated = sisterItems.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i));
-    setSisterItems(updated);
-    saveSisterGrocery(updated);
+    setSisterItems(updated); saveSisterGrocery(updated);
   }
   function addSister(name) {
     const updated = [...sisterItems, { id: uid(), name, checked: false }];
-    setSisterItems(updated);
-    saveSisterGrocery(updated);
+    setSisterItems(updated); saveSisterGrocery(updated);
   }
   function deleteSister(id) {
     const updated = sisterItems.filter((i) => i.id !== id);
-    setSisterItems(updated);
-    saveSisterGrocery(updated);
+    setSisterItems(updated); saveSisterGrocery(updated);
   }
 
   const totalUnchecked =
     staples.filter((s) => !s.checked).length +
-    mealItems.filter((i) => !i.checked).length +
+    mealItemsWithChecked.filter((i) => !i.checked).length +
     myExtras.filter((i) => !i.checked).length +
     sisterItems.filter((i) => !i.checked).length;
 
   return (
     <div className="flex flex-col min-h-full pb-28">
-      {/* Header */}
       <div className="px-5 pt-12 pb-4 flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#3d2b1f] tracking-tight">TJ's List 🛒</h1>
           <p className="text-sm text-[#a89080] mt-0.5">
-            {loading ? 'Loading…' : totalUnchecked > 0
-              ? `${totalUnchecked} item${totalUnchecked !== 1 ? 's' : ''} left`
+            {loading ? 'Loading…'
+              : totalUnchecked > 0 ? `${totalUnchecked} item${totalUnchecked !== 1 ? 's' : ''} left`
               : '🎉 All done!'}
           </p>
         </div>
@@ -233,7 +206,6 @@ export default function GroceryPage() {
         </button>
       </div>
 
-      {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={28} className="animate-spin text-[#d4b896]" />
@@ -242,35 +214,22 @@ export default function GroceryPage() {
 
       {!loading && (
         <div className="px-4 flex flex-col gap-5">
-          {/* ── Staples ── */}
+          {/* Staples */}
           <section className="bg-[#fffaf4] rounded-2xl border border-[#f0e0cc] p-4">
-            <SectionHeader
-              title="Weekly staples"
-              count={staples.filter((s) => !s.checked).length}
-              open={staplesOpen}
-              toggle={() => setStaplesOpen((v) => !v)}
-              accent="text-[#b5652a]"
-            />
+            <SectionHeader title="Weekly staples" count={staples.filter((s) => !s.checked).length}
+              open={staplesOpen} toggle={() => setStaplesOpen((v) => !v)} accent="text-[#b5652a]" />
             {staplesOpen && (
               <>
                 <div className="flex flex-col gap-1.5">
                   {sortByChecked(staples).map((item) => (
-                    <CheckItem
-                      key={item.id}
-                      item={item}
-                      onToggle={toggleStaple}
-                      onDelete={editingStaples ? deleteStaple : null}
-                    />
+                    <CheckItem key={item.id} item={item} onToggle={toggleStaple}
+                      onDelete={editingStaples ? deleteStaple : null} />
                   ))}
-                  {staples.length === 0 && (
-                    <p className="text-xs text-[#c0a090] text-center py-3">No staples yet</p>
-                  )}
+                  {staples.length === 0 && <p className="text-xs text-[#c0a090] text-center py-3">No staples yet</p>}
                 </div>
                 <AddItemRow placeholder="Add staple..." onAdd={(name) => addStaple(name)} />
-                <button
-                  onClick={() => setEditingStaples((v) => !v)}
-                  className="flex items-center gap-1 mt-2 text-xs text-[#a89080]"
-                >
+                <button onClick={() => setEditingStaples((v) => !v)}
+                  className="flex items-center gap-1 mt-2 text-xs text-[#a89080]">
                   <Settings size={12} />
                   {editingStaples ? 'Done editing' : 'Edit staples'}
                 </button>
@@ -278,72 +237,51 @@ export default function GroceryPage() {
             )}
           </section>
 
-          {/* ── From Meals ── */}
+          {/* From Meals */}
           <section className="bg-[#fffaf4] rounded-2xl border border-[#f0e0cc] p-4">
-            <SectionHeader
-              title="From meals"
-              count={mealItems.filter((i) => !i.checked).length}
-              open={mealsOpen}
-              toggle={() => setMealsOpen((v) => !v)}
-              accent="text-[#7a8c3d]"
-            />
-            {mealsOpen && (
-              mealItems.length === 0 ? (
-                <p className="text-xs text-[#c0a090] text-center py-3">
-                  Go to Meals → tap "Add to this week" on a meal to fill ingredients here
-                </p>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {sortByChecked(mealItems).map((item) => (
-                    <CheckItem key={item.id} item={item} onToggle={toggleMealItem} onDelete={null} />
-                  ))}
-                </div>
-              )
+            <SectionHeader title="From meals" count={mealItemsWithChecked.filter((i) => !i.checked).length}
+              open={true} toggle={() => {}} accent="text-[#7a8c3d]" />
+            {mealItemsWithChecked.length === 0 ? (
+              <p className="text-xs text-[#c0a090] text-center py-3">
+                Go to Meals → tap <strong>"Add to this week"</strong> on a meal to populate ingredients here
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {sortByChecked(mealItemsWithChecked).map((item) => (
+                  <CheckItem key={item.id} item={item} onToggle={toggleMealItem} onDelete={null} />
+                ))}
+              </div>
             )}
           </section>
 
-          {/* ── My extras ── */}
+          {/* My extras */}
           <section className="bg-[#fffaf4] rounded-2xl border border-[#f0e0cc] p-4">
-            <SectionHeader
-              title="My extras"
-              count={myExtras.filter((i) => !i.checked).length}
-              open={extrasOpen}
-              toggle={() => setExtrasOpen((v) => !v)}
-              accent="text-[#5a7ab5]"
-            />
+            <SectionHeader title="My extras" count={myExtras.filter((i) => !i.checked).length}
+              open={extrasOpen} toggle={() => setExtrasOpen((v) => !v)} accent="text-[#5a7ab5]" />
             {extrasOpen && (
               <>
                 <div className="flex flex-col gap-1.5">
                   {sortByChecked(myExtras).map((item) => (
                     <CheckItem key={item.id} item={item} onToggle={toggleMyExtra} onDelete={deleteMyExtra} />
                   ))}
-                  {myExtras.length === 0 && (
-                    <p className="text-xs text-[#c0a090] text-center py-3">No extras added</p>
-                  )}
+                  {myExtras.length === 0 && <p className="text-xs text-[#c0a090] text-center py-3">No extras added</p>}
                 </div>
                 <AddItemRow placeholder="Add one-off item..." onAdd={addMyExtra} isTJToggle={false} />
               </>
             )}
           </section>
 
-          {/* ── Sister's ── */}
+          {/* Sister */}
           <section className="bg-[#fff5f8] rounded-2xl border border-[#f0d0da] p-4">
-            <SectionHeader
-              title="For your sister 💕"
-              count={sisterItems.filter((i) => !i.checked).length}
-              open={sisterOpen}
-              toggle={() => setSisterOpen((v) => !v)}
-              accent="text-[#c25a7a]"
-            />
+            <SectionHeader title="For your sister 💕" count={sisterItems.filter((i) => !i.checked).length}
+              open={sisterOpen} toggle={() => setSisterOpen((v) => !v)} accent="text-[#c25a7a]" />
             {sisterOpen && (
               <>
                 <div className="flex flex-col gap-1.5">
                   {sortByChecked(sisterItems).map((item) => (
                     <CheckItem key={item.id} item={item} onToggle={toggleSister} onDelete={deleteSister} />
                   ))}
-                  {sisterItems.length === 0 && (
-                    <p className="text-xs text-[#d0a0b0] text-center py-3">No items added for her yet</p>
-                  )}
+                  {sisterItems.length === 0 && <p className="text-xs text-[#d0a0b0] text-center py-3">No items added for her yet</p>}
                 </div>
                 <AddItemRow placeholder="Add her item..." onAdd={(name) => addSister(name)} />
               </>
