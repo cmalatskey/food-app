@@ -10,8 +10,14 @@ import {
   getSisterGrocery,
   saveSisterGrocery,
   getActiveMealIds,
+  saveActiveMealIds,
   uid,
 } from '../utils/storage';
+
+// Unchecked items first, checked items at the bottom
+function sortByChecked(items) {
+  return [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
+}
 
 function SectionHeader({ title, count, open, toggle, accent }) {
   return (
@@ -49,7 +55,7 @@ function AddItemRow({ placeholder, onAdd, isTJToggle }) {
         onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && submit()}
         placeholder={placeholder}
-        className="flex-1 bg-[#f5e8d6] rounded-xl px-3 py-2 text-sm text-[#3d2b1f] placeholder-[#b8a090] outline-none"
+        className="flex-1 bg-[#f5e8d6] rounded-xl px-3 py-2 text-base text-[#3d2b1f] placeholder-[#b8a090] outline-none"
       />
       {isTJToggle !== undefined && (
         <button
@@ -96,13 +102,27 @@ export default function GroceryPage() {
     saveStaples(updated);
   }
 
-  function resetStaples() {
-    const reset = staples.map((s) => ({ ...s, checked: false }));
-    setStaples(reset);
-    saveStaples(reset);
+  // ── Reset the whole week ───────────────────────────────────────────────
+  function resetWeek() {
+    // Uncheck all staples (they recur every week)
+    const resetedStaples = staples.map((s) => ({ ...s, checked: false }));
+    setStaples(resetedStaples);
+    saveStaples(resetedStaples);
+
+    // Clear active meals for the week
+    saveActiveMealIds([]);
+    setMealItems([]);
+
+    // Clear one-off extras
+    setMyExtras([]);
+    saveMyGrocery([]);
+
+    // Clear sister's items
+    setSisterItems([]);
+    saveSisterGrocery([]);
   }
 
-  // ── Meal-driven ingredients ────────────────────────────────────────────
+  // ── Meal-driven ingredients (re-reads localStorage every mount) ────────
   const mealIngredients = useMemo(() => {
     const meals = getMeals();
     const activeIds = getActiveMealIds();
@@ -114,11 +134,18 @@ export default function GroceryPage() {
         const key = ing.name.toLowerCase();
         if (!seen.has(key)) {
           seen.add(key);
-          items.push({ id: ing.id + '_' + meal.id, name: ing.name, isTJ: ing.isTJ, fromMeal: meal.name, checked: false });
+          items.push({
+            id: ing.id + '_' + meal.id,
+            name: ing.name,
+            isTJ: ing.isTJ,
+            fromMeal: meal.name,
+            checked: false,
+          });
         }
       }
     }
     return items;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [mealItems, setMealItems] = useState(mealIngredients);
@@ -190,8 +217,8 @@ export default function GroceryPage() {
           </p>
         </div>
         <button
-          onClick={resetStaples}
-          className="flex items-center gap-1.5 text-xs text-[#a89080] bg-[#f5e8d6] px-3 py-2 rounded-xl"
+          onClick={resetWeek}
+          className="flex items-center gap-1.5 text-xs text-[#a89080] bg-[#f5e8d6] px-3 py-2 rounded-xl active:bg-[#ecd8c0]"
         >
           <RotateCcw size={13} />
           Reset week
@@ -211,7 +238,7 @@ export default function GroceryPage() {
           {staplesOpen && (
             <>
               <div className="flex flex-col gap-1.5">
-                {staples.map((item) => (
+                {sortByChecked(staples).map((item) => (
                   <CheckItem
                     key={item.id}
                     item={item}
@@ -250,11 +277,11 @@ export default function GroceryPage() {
             <>
               {mealItems.length === 0 ? (
                 <p className="text-xs text-[#c0a090] text-center py-3">
-                  Go to Meals and tap "Add to this week" to auto-fill ingredients here
+                  Go to Meals → tap "Add to this week" on a meal to fill ingredients here
                 </p>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  {mealItems.map((item) => (
+                  {sortByChecked(mealItems).map((item) => (
                     <CheckItem
                       key={item.id}
                       item={item}
@@ -280,7 +307,7 @@ export default function GroceryPage() {
           {extrasOpen && (
             <>
               <div className="flex flex-col gap-1.5">
-                {myExtras.map((item) => (
+                {sortByChecked(myExtras).map((item) => (
                   <CheckItem
                     key={item.id}
                     item={item}
@@ -313,7 +340,7 @@ export default function GroceryPage() {
           {sisterOpen && (
             <>
               <div className="flex flex-col gap-1.5">
-                {sisterItems.map((item) => (
+                {sortByChecked(sisterItems).map((item) => (
                   <CheckItem
                     key={item.id}
                     item={item}

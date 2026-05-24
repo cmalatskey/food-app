@@ -55,7 +55,7 @@ export default function MealForm({ initial, onSave, onCancel }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-      <div className="bg-[#fdf6ee] w-full rounded-t-3xl max-h-[92svh] overflow-y-auto pb-8">
+      <div className="bg-[#fdf6ee] w-full rounded-t-3xl max-h-[92svh] overflow-y-auto pb-24">
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-[#dcc9b4] rounded-full" />
@@ -178,7 +178,7 @@ export default function MealForm({ initial, onSave, onCancel }) {
                 onChange={(e) => setNewIngredient(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addIngredient())}
                 placeholder="Add ingredient..."
-                className="flex-1 bg-[#f5e8d6] rounded-xl px-3 py-2.5 text-[#3d2b1f] placeholder-[#b8a090] outline-none text-sm"
+                className="flex-1 bg-[#f5e8d6] rounded-xl px-3 py-2.5 text-[#3d2b1f] placeholder-[#b8a090] outline-none text-base"
               />
               <button
                 type="button"
@@ -212,7 +212,7 @@ export default function MealForm({ initial, onSave, onCancel }) {
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               placeholder="Any extra tips, variations, or links..."
               rows={2}
-              className="bg-[#f5e8d6] rounded-xl px-4 py-3 text-[#3d2b1f] placeholder-[#b8a090] outline-none text-sm resize-none"
+              className="bg-[#f5e8d6] rounded-xl px-4 py-3 text-[#3d2b1f] placeholder-[#b8a090] outline-none text-base resize-none"
             />
           </div>
 
