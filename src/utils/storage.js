@@ -1,11 +1,11 @@
 // Simple localStorage helpers
 
 const KEYS = {
-  MEALS: 'carly_meals',
-  STAPLES: 'carly_staples',
-  GROCERY_MY: 'carly_grocery_my',
-  GROCERY_SISTER: 'carly_grocery_sister',
-  ACTIVE_MEALS: 'carly_active_meals', // meals selected for this week
+  MEALS: "carly_meals",
+  STAPLES: "carly_staples",
+  GROCERY_MY: "carly_grocery_my",
+  GROCERY_SISTER: "carly_grocery_sister",
+  ACTIVE_MEALS: "carly_active_meals", // meals selected for this week
 };
 
 function get(key, fallback) {
@@ -64,13 +64,12 @@ export function saveActiveMealIds(ids) {
 
 // ── Default staples ────────────────────────────────────────────────────────
 const DEFAULT_STAPLES = [
-  { id: 's1', name: 'Eggs', checked: false },
-  { id: 's2', name: 'Almond milk', checked: false },
-  { id: 's3', name: 'Greek yogurt', checked: false },
-  { id: 's4', name: 'Bananas', checked: false },
-  { id: 's5', name: 'Avocados', checked: false },
-  { id: 's6', name: 'Olive oil', checked: false },
-  { id: 's7', name: 'Lemons', checked: false },
+  { id: "s1", name: "Carrots", checked: false },
+  { id: "s2", name: "Cucumbers", checked: false },
+  { id: "s3", name: "Greek yogurt", checked: false },
+  { id: "s4", name: "Bananas", checked: false },
+  { id: "s5", name: "Chicken", checked: false },
+  { id: "s6", name: "Sweet Potatoes", checked: false },
 ];
 
 export function uid() {
