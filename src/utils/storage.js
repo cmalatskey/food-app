@@ -24,53 +24,55 @@ async function set(key, value) {
 }
 
 // ── Meals ──────────────────────────────────────────────────────────────────
-export async function getMeals() {
-  return get('meals', [])
-}
-export async function saveMeals(meals) {
-  return set('meals', meals)
-}
-
-// ── Staples ────────────────────────────────────────────────────────────────
-export async function getStaples() {
-  return get('staples', DEFAULT_STAPLES)
-}
-export async function saveStaples(staples) {
-  return set('staples', staples)
-}
-
-// ── Weekly grocery lists ───────────────────────────────────────────────────
-export async function getMyGrocery() {
-  return get('grocery_my', [])
-}
-export async function saveMyGrocery(items) {
-  return set('grocery_my', items)
-}
-
-export async function getSisterGrocery() {
-  return get('grocery_sister', [])
-}
-export async function saveSisterGrocery(items) {
-  return set('grocery_sister', items)
-}
+export async function getMeals() { return get('meals', []) }
+export async function saveMeals(meals) { return set('meals', meals) }
 
 // ── Active meals for the week ──────────────────────────────────────────────
-export async function getActiveMealIds() {
-  return get('active_meal_ids', [])
-}
-export async function saveActiveMealIds(ids) {
-  return set('active_meal_ids', ids)
-}
+export async function getActiveMealIds() { return get('active_meal_ids', []) }
+export async function saveActiveMealIds(ids) { return set('active_meal_ids', ids) }
 
-// ── Default staples ────────────────────────────────────────────────────────
-const DEFAULT_STAPLES = [
-  { id: 's1', name: 'Carrots', checked: false },
-  { id: 's2', name: 'Cucumbers', checked: false },
-  { id: 's3', name: 'Greek yogurt', checked: false },
-  { id: 's4', name: 'Bananas', checked: false },
-  { id: 's5', name: 'Chicken', checked: false },
-  { id: 's6', name: 'Sweet Potatoes', checked: false },
-]
+// ── Unified grocery items ──────────────────────────────────────────────────
+// Each item: { id, name, category, isStaple, isTJ, checked, fromMeal? }
+export async function getGroceryItems() {
+  const items = await get('grocery_items', null)
+
+  // First-ever load or migrating from old format
+  if (items === null) {
+    const [oldStaples, oldExtras] = await Promise.all([
+      get('staples', []),
+      get('grocery_my', []),
+    ])
+    const migrated = [
+      ...oldStaples.map((s) => ({
+        id: s.id,
+        name: s.name,
+        category: 'other',
+        isStaple: true,
+        isTJ: false,
+        checked: false,
+        fromMeal: null,
+      })),
+      ...oldExtras.map((i) => ({
+        id: i.id,
+        name: i.name,
+        category: 'other',
+        isStaple: false,
+        isTJ: i.isTJ ?? false,
+        checked: false,
+        fromMeal: null,
+      })),
+    ]
+    await set('grocery_items', migrated)
+    return migrated
+  }
+
+  return items
+}
+export async function saveGroceryItems(items) { return set('grocery_items', items) }
+
+// ── Sister's items (stays separate) ───────────────────────────────────────
+export async function getSisterGrocery() { return get('grocery_sister', []) }
+export async function saveSisterGrocery(items) { return set('grocery_sister', items) }
 
 // ── ID generator ──────────────────────────────────────────────────────────
 export function uid() {
