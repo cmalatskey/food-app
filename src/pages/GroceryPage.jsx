@@ -1,19 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, RotateCcw, RefreshCw, Loader2, X } from 'lucide-react';
-import CheckItem from '../components/CheckItem';
+import EditItemSheet from '../components/EditItemSheet';
 import {
   getGroceryItems, saveGroceryItems,
   getSisterGrocery, saveSisterGrocery,
   saveActiveMealIds,
   uid,
 } from '../utils/storage';
-import { CATEGORIES, CATEGORY_MAP, DEFAULT_CATEGORY } from '../utils/categories';
+import { CATEGORIES, DEFAULT_CATEGORY } from '../utils/categories';
 
 function sortByChecked(items) {
   return [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
 }
 
-// ── Add item row at the bottom ─────────────────────────────────────────────
+// ── Add item panel ─────────────────────────────────────────────────────────
 function AddItemPanel({ onAdd }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
@@ -32,22 +32,19 @@ function AddItemPanel({ onAdd }) {
   return (
     <div className="bg-white rounded-2xl border border-[#f0e0cc] p-4 flex flex-col gap-3">
       <p className="text-xs font-bold uppercase tracking-wider text-[#b5652a]">Add item</p>
-
-      {/* Name row */}
       <div className="flex gap-2">
         <input value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="Item name..."
           className="flex-1 bg-[#f5e8d6] rounded-xl px-3 py-2.5 text-base text-[#3d2b1f] placeholder-[#b8a090] outline-none" />
-        <button onClick={submit} className="bg-[#b5652a] text-white rounded-xl px-4 py-2 font-semibold active:scale-95 text-sm">
+        <button onClick={submit}
+          className="bg-[#b5652a] text-white rounded-xl px-4 py-2 font-semibold active:scale-95 text-sm">
           Add
         </button>
       </div>
-
-      {/* Category chips */}
       <div className="flex gap-1.5 flex-wrap">
         {CATEGORIES.map((cat) => (
-          <button key={cat.id} type="button" onClick={() => setCategory(cat.id)}
+          <button key={cat.id} onClick={() => setCategory(cat.id)}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
               category === cat.id ? 'bg-[#b5652a] text-white' : 'bg-[#f5e8d6] text-[#7a5c48]'
             }`}>
@@ -55,17 +52,14 @@ function AddItemPanel({ onAdd }) {
           </button>
         ))}
       </div>
-
-      {/* Toggles */}
       <div className="flex gap-2">
-        <button type="button" onClick={() => setIsStaple((v) => !v)}
+        <button onClick={() => setIsStaple((v) => !v)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
             isStaple ? 'bg-[#b5652a] text-white' : 'bg-[#f5e8d6] text-[#7a5c48]'
           }`}>
-          <RefreshCw size={12} />
-          Recurring
+          <RefreshCw size={12} /> Recurring
         </button>
-        <button type="button" onClick={() => setIsTJ((v) => !v)}
+        <button onClick={() => setIsTJ((v) => !v)}
           className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
             isTJ ? 'bg-[#c9472b] text-white' : 'bg-[#f5e8d6] text-[#a89080]'
           }`}>
@@ -76,8 +70,8 @@ function AddItemPanel({ onAdd }) {
   );
 }
 
-// ── Single grocery item row ────────────────────────────────────────────────
-function GroceryItemRow({ item, onToggle, onDelete, onToggleStaple }) {
+// ── Tappable grocery item row ──────────────────────────────────────────────
+function GroceryItemRow({ item, onToggle, onTapEdit }) {
   return (
     <div className="flex items-center gap-3 py-2.5 px-3 bg-white rounded-xl border border-[#f0e0cc]">
       <button onClick={() => onToggle(item.id)}
@@ -90,9 +84,14 @@ function GroceryItemRow({ item, onToggle, onDelete, onToggleStaple }) {
           </svg>
         )}
       </button>
-      <span className={`flex-1 text-sm ${item.checked ? 'line-through text-[#b8a090]' : 'text-[#3d2b1f]'}`}>
-        {item.name}
-      </span>
+
+      {/* Tap item name to edit */}
+      <button onClick={() => onTapEdit(item)} className="flex-1 text-left">
+        <span className={`text-sm ${item.checked ? 'line-through text-[#b8a090]' : 'text-[#3d2b1f]'}`}>
+          {item.name}
+        </span>
+      </button>
+
       {item.fromMeal && (
         <span className="text-[10px] text-[#a89080] italic shrink-0">{item.fromMeal}</span>
       )}
@@ -100,20 +99,13 @@ function GroceryItemRow({ item, onToggle, onDelete, onToggleStaple }) {
         <span className="text-[10px] bg-[#c9472b] text-white px-1.5 py-0.5 rounded-full font-semibold shrink-0">TJ's</span>
       )}
       {item.isStaple && (
-        <button onClick={() => onToggleStaple(item.id)} title="Recurring item" className="shrink-0">
-          <RefreshCw size={12} className="text-[#b5652a]" />
-        </button>
-      )}
-      {!item.isStaple && onDelete && (
-        <button onClick={() => onDelete(item.id)} className="text-[#c0a090] p-0.5 shrink-0">
-          <X size={14} />
-        </button>
+        <RefreshCw size={11} className="text-[#b5652a] shrink-0" />
       )}
     </div>
   );
 }
 
-// ── Sister item row (simple) ───────────────────────────────────────────────
+// ── Sister item row ────────────────────────────────────────────────────────
 function SisterItemRow({ item, onToggle, onDelete }) {
   return (
     <div className="flex items-center gap-3 py-2.5 px-3 bg-white rounded-xl border border-[#f0d0da]">
@@ -142,8 +134,9 @@ export default function GroceryPage({ meals, activeMealIds }) {
   const [myItems, setMyItems] = useState([]);
   const [sisterItems, setSisterItems] = useState([]);
   const [sisterInput, setSisterInput] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
+  const [activeFilter, setActiveFilter] = useState(null); // null = show all
 
-  // Load grocery + sister from Supabase on mount
   useEffect(() => {
     Promise.all([getGroceryItems(), getSisterGrocery()]).then(([items, sister]) => {
       setMyItems(items);
@@ -152,23 +145,18 @@ export default function GroceryPage({ meals, activeMealIds }) {
     });
   }, []);
 
-  // ── Derive meal ingredients from shared props, merge into item list ───────
+  // ── Merge saved items + live meal ingredients ─────────────────────────────
   const allItems = useMemo(() => {
     const activeMeals = meals.filter((m) => activeMealIds.includes(m.id));
-    const mealIngIds = new Set();
-
-    // Collect all meal-driven items
-    const mealDriven = [];
     const seen = new Set();
+    const mealDriven = [];
     for (const meal of activeMeals) {
       for (const ing of meal.ingredients ?? []) {
         const key = ing.name.toLowerCase();
         if (!seen.has(key)) {
           seen.add(key);
-          const compositeId = `meal_${ing.id}_${meal.id}`;
-          mealIngIds.add(compositeId);
           mealDriven.push({
-            id: compositeId,
+            id: `meal_${ing.id}_${meal.id}`,
             name: ing.name,
             category: ing.category ?? DEFAULT_CATEGORY,
             isStaple: false,
@@ -179,52 +167,41 @@ export default function GroceryPage({ meals, activeMealIds }) {
         }
       }
     }
-
-    // Merge: saved items + meal-driven (dedupe by name)
     const savedNames = new Set(myItems.map((i) => i.name.toLowerCase()));
     const newMealItems = mealDriven.filter((m) => !savedNames.has(m.name.toLowerCase()));
-
     return [...myItems, ...newMealItems];
   }, [myItems, meals, activeMealIds]);
 
   function persistMyItems(updated) {
-    // Only save non-meal-driven items to Supabase
     const toSave = updated.filter((i) => !i.id.startsWith('meal_'));
     setMyItems(toSave);
     saveGroceryItems(toSave);
   }
 
   function toggleItem(id) {
-    const updated = allItems.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i));
-    persistMyItems(updated);
+    persistMyItems(allItems.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i)));
+  }
+
+  function saveEditedItem(updated) {
+    persistMyItems(allItems.map((i) => (i.id === updated.id ? updated : i)));
   }
 
   function deleteItem(id) {
     persistMyItems(allItems.filter((i) => i.id !== id));
   }
 
-  function toggleStaple(id) {
-    const updated = allItems.map((i) => (i.id === id ? { ...i, isStaple: !i.isStaple } : i));
-    persistMyItems(updated);
-  }
-
   function addItem({ name, category, isStaple, isTJ }) {
-    const newItem = { id: uid(), name, category, isStaple, isTJ, checked: false, fromMeal: null };
-    const updated = [...allItems, newItem];
-    persistMyItems(updated);
+    persistMyItems([...allItems, { id: uid(), name, category, isStaple, isTJ, checked: false, fromMeal: null }]);
   }
 
-  // ── Reset week ────────────────────────────────────────────────────────────
   function resetWeek() {
-    // Keep staples (unchecked), drop everything else
-    const kept = myItems
-      .filter((i) => i.isStaple)
-      .map((i) => ({ ...i, checked: false }));
+    const kept = myItems.filter((i) => i.isStaple).map((i) => ({ ...i, checked: false }));
     setMyItems(kept);
     saveGroceryItems(kept);
     saveActiveMealIds([]);
     setSisterItems([]);
     saveSisterGrocery([]);
+    setActiveFilter(null);
   }
 
   // ── Sister ────────────────────────────────────────────────────────────────
@@ -245,18 +222,26 @@ export default function GroceryPage({ meals, activeMealIds }) {
     saveSisterGrocery(updated);
   }
 
-  // ── Group by category ─────────────────────────────────────────────────────
+  // ── Group by category, respecting active filter ───────────────────────────
   const grouped = useMemo(() => {
+    const filtered = activeFilter
+      ? allItems.filter((i) => (i.category ?? DEFAULT_CATEGORY) === activeFilter)
+      : allItems;
     const groups = {};
-    for (const item of allItems) {
+    for (const item of filtered) {
       const cat = item.category ?? DEFAULT_CATEGORY;
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(item);
     }
-    // Return in CATEGORIES order, only non-empty
     return CATEGORIES
       .filter((c) => groups[c.id]?.length > 0)
       .map((c) => ({ ...c, items: sortByChecked(groups[c.id]) }));
+  }, [allItems, activeFilter]);
+
+  // Which categories actually have items (for filter chips)
+  const usedCategories = useMemo(() => {
+    const used = new Set(allItems.map((i) => i.category ?? DEFAULT_CATEGORY));
+    return CATEGORIES.filter((c) => used.has(c.id));
   }, [allItems]);
 
   const totalUnchecked = allItems.filter((i) => !i.checked).length
@@ -265,7 +250,7 @@ export default function GroceryPage({ meals, activeMealIds }) {
   return (
     <div className="flex flex-col min-h-full pb-28">
       {/* Header */}
-      <div className="px-5 pt-12 pb-4 flex items-end justify-between">
+      <div className="px-5 pt-12 pb-3 flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#3d2b1f] tracking-tight">TJ's List 🛒</h1>
           <p className="text-sm text-[#a89080] mt-0.5">
@@ -281,6 +266,39 @@ export default function GroceryPage({ meals, activeMealIds }) {
         </button>
       </div>
 
+      {/* Category filter chips */}
+      {!loading && usedCategories.length > 1 && (
+        <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-none">
+          <button
+            onClick={() => setActiveFilter(null)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              activeFilter === null ? 'bg-[#3d2b1f] text-white' : 'bg-[#f5e8d6] text-[#7a5c48]'
+            }`}>
+            All
+          </button>
+          {usedCategories.map((cat) => {
+            const unchecked = allItems.filter(
+              (i) => (i.category ?? DEFAULT_CATEGORY) === cat.id && !i.checked
+            ).length;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveFilter(activeFilter === cat.id ? null : cat.id)}
+                className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  activeFilter === cat.id ? 'bg-[#b5652a] text-white' : 'bg-[#f5e8d6] text-[#7a5c48]'
+                }`}>
+                {cat.emoji} {cat.label}
+                {unchecked > 0 && (
+                  <span className={`text-[10px] ml-0.5 ${activeFilter === cat.id ? 'text-white/70' : 'text-[#a89080]'}`}>
+                    {unchecked}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {loading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={28} className="animate-spin text-[#d4b896]" />
@@ -288,21 +306,20 @@ export default function GroceryPage({ meals, activeMealIds }) {
       )}
 
       {!loading && (
-        <div className="px-4 flex flex-col gap-4">
-
-          {/* ── Category groups ── */}
+        <div className="px-4 flex flex-col gap-5">
+          {/* Empty state */}
           {grouped.length === 0 && (
-            <div className="flex flex-col items-center py-12 gap-2 text-[#c8aa90]">
+            <div className="flex flex-col items-center py-10 gap-2 text-[#c8aa90]">
               <span className="text-4xl">🛒</span>
               <p className="text-sm text-center">
-                Your list is empty.<br />Add items below or activate meals on the Meals tab.
+                {activeFilter ? 'Nothing in this category yet.' : 'Your list is empty — add items below or activate meals on the Meals tab.'}
               </p>
             </div>
           )}
 
+          {/* Grouped items */}
           {grouped.map((cat) => (
             <div key={cat.id}>
-              {/* Category header */}
               <div className="flex items-center gap-2 mb-2 px-1">
                 <span className="text-base">{cat.emoji}</span>
                 <span className="text-xs font-bold uppercase tracking-wider text-[#8a7060]">{cat.label}</span>
@@ -316,28 +333,25 @@ export default function GroceryPage({ meals, activeMealIds }) {
                     key={item.id}
                     item={item}
                     onToggle={toggleItem}
-                    onDelete={deleteItem}
-                    onToggleStaple={toggleStaple}
+                    onTapEdit={setEditingItem}
                   />
                 ))}
               </div>
             </div>
           ))}
 
-          {/* ── Add item panel ── */}
+          {/* Add item */}
           <AddItemPanel onAdd={addItem} />
 
-          {/* ── Sister's section ── */}
+          {/* Sister */}
           <div className="bg-[#fff5f8] rounded-2xl border border-[#f0d0da] p-4 flex flex-col gap-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-[#c25a7a]">
-              For your sister 💕
-            </p>
+            <p className="text-xs font-bold uppercase tracking-wider text-[#c25a7a]">For your sister 💕</p>
             <div className="flex flex-col gap-1.5">
               {sortByChecked(sisterItems).map((item) => (
                 <SisterItemRow key={item.id} item={item} onToggle={toggleSister} onDelete={deleteSister} />
               ))}
               {sisterItems.length === 0 && (
-                <p className="text-xs text-[#d0a0b0] text-center py-1">No items added for her yet</p>
+                <p className="text-xs text-[#d0a0b0] text-center py-1">Nothing added for her yet</p>
               )}
             </div>
             <div className="flex gap-2 mt-1">
@@ -352,6 +366,16 @@ export default function GroceryPage({ meals, activeMealIds }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit item sheet */}
+      {editingItem && (
+        <EditItemSheet
+          item={editingItem}
+          onSave={saveEditedItem}
+          onDelete={deleteItem}
+          onClose={() => setEditingItem(null)}
+        />
       )}
     </div>
   );
